@@ -7,12 +7,33 @@ import Capacitor
  */
 @objc(StashMediaPlugin)
 public class StashMediaPlugin: CAPPlugin {
-    private let implementation = StashMedia()
+    private let stashMedia = StashMedia()
 
-    @objc func echo(_ call: CAPPluginCall) {
-        let value = call.getString("value") ?? ""
-        call.resolve([
-            "value": implementation.echo(value)
-        ])
+    @objc func copyPhotoToClipboard(_ call: CAPPluginCall) {
+        if let urlString = call.getString("url") {
+            stashMedia.copyPhotoToClipboard(from: urlString) { success, message in
+                if success {
+                    call.resolve(["success": true, "message": message])
+                } else {
+                    call.reject("COPY_FAILED", message, nil)
+                }
+            }
+        } else {
+            call.reject("INVALID_PARAMETERS", "URL parameter is missing", nil)
+        }
+    }
+
+    @objc func savePhoto(_ call: CAPPluginCall) {
+        if let urlString = call.getString("url"), let imageUrl = URL(string: urlString) {
+            stashMedia.saveImageToPhotoLibrary(from: imageUrl) { success, message in
+                if success {
+                    call.resolve(["success": true, "message": message])
+                } else {
+                    call.reject("SAVE_FAILED", message, nil)
+                }
+            }
+        } else {
+            call.reject("INVALID_PARAMETERS", "URL parameter is missing", nil)
+        }
     }
 }

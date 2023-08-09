@@ -1,3 +1,4 @@
 export interface StashMediaPlugin {
-  echo(options: { value: string }): Promise<{ value: string }>;
+  savePhoto(options: { url: string }): Promise<void>;
+  copyPhotoToClipboard(options: { url: string }): Promise<void>;
 }

@@ -1,5 +1,7 @@
 package dev.harding.capacitor.stashmedia;
 
+import android.content.Context;
+
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -9,14 +11,20 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "StashMedia")
 public class StashMediaPlugin extends Plugin {
 
-    private StashMedia implementation = new StashMedia();
+    private StashMedia stashMedia = new StashMedia();
 
     @PluginMethod
-    public void echo(PluginCall call) {
-        String value = call.getString("value");
+    public void copyPhotoToClipboard(PluginCall call) {
+        String url = call.getString("url");
+        stashMedia.copyPhotoToClipboard(getContext(), url);
+        call.resolve();
+    }
 
-        JSObject ret = new JSObject();
-        ret.put("value", implementation.echo(value));
-        call.resolve(ret);
+    @PluginMethod
+    public void savePhoto(PluginCall call) {
+        String url = call.getString("url");
+        Context context = getContext();
+        stashMedia.savePhoto(context, url);
+        call.resolve();
     }
 }
