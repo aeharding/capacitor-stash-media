@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import Photos
+import SDWebImage
 
 class StashMedia {
     func copyPhotoToClipboard(from imageURLString: String, completion: @escaping (Bool, String) -> Void) {
@@ -22,22 +23,27 @@ class StashMedia {
     }
 
     func saveImageToPhotoLibrary(from imageURL: URL, completion: @escaping (Bool, String) -> Void) {
-        DispatchQueue.global(qos: .background).async {
-            if let imageData = try? Data(contentsOf: imageURL),
-               let image = UIImage(data: imageData) {
-                PHPhotoLibrary.shared().performChanges {
-                    PHAssetChangeRequest.creationRequestForAsset(from: image)
-                } completionHandler: { success, error in
-                    if success {
-                        completion(true, "Image saved to photo library")
-                    } else if let error = error {
-                        completion(false, "Failed to save image: \(error.localizedDescription)")
-                    } else {
-                        completion(false, "Failed to save image")
-                    }
+        SDWebImageDownloader.shared.downloadImage(with: imageURL, options: [], progress: nil) { (image, _, error, _) in
+            if let error = error {
+                completion(false, "Failed to download image: \(error.localizedDescription)")
+                return
+            }
+
+            guard let image = image else {
+                completion(false, "Failed to download image")
+                return
+            }
+
+            PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest.creationRequestForAsset(from: image)
+            } completionHandler: { success, error in
+                if success {
+                    completion(true, "Image saved to photo library")
+                } else if let error = error {
+                    completion(false, "Failed to save image: \(error.localizedDescription)")
+                } else {
+                    completion(false, "Failed to save image")
                 }
-            } else {
-                completion(false, "Failed to fetch image data")
             }
         }
     }
