@@ -11,10 +11,13 @@ import android.provider.MediaStore;
 import android.util.Base64;
 import android.util.Log;
 
+import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URL;
+import java.net.URLConnection;
 
 public class StashMedia {
     public void copyPhotoToClipboard(Context context, String imageUrl) {
@@ -72,19 +75,32 @@ public class StashMedia {
 
     public void savePhoto(Context context, String url) {
         try {
-            InputStream inputStream = new java.net.URL(url).openStream();
-            Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
+            URL imageUrl = new URL(url);
+            URLConnection connection = imageUrl.openConnection();
+            connection.connect();
+
+            String mimeType = connection.getContentType();
 
             ContentValues contentValues = new ContentValues();
             contentValues.put(MediaStore.Images.Media.DISPLAY_NAME, "Image");
-            contentValues.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+            contentValues.put(MediaStore.Images.Media.MIME_TYPE, mimeType);
 
             Uri imageUri = context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues);
 
             if (imageUri != null) {
-                try (OutputStream outputStream = context.getContentResolver().openOutputStream(imageUri)) {
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream);
-                    Log.d("StashMedia", "Image saved to gallery");
+                try (OutputStream outputStream = context.getContentResolver().openOutputStream(imageUri);
+                     InputStream inputStream = new BufferedInputStream(connection.getInputStream())) {
+                    if (outputStream != null) {
+                        byte[] buffer = new byte[4096];
+                        int bytesRead;
+                        while ((bytesRead = inputStream.read(buffer)) != -1) {
+                            outputStream.write(buffer, 0, bytesRead);
+                        }
+                        outputStream.flush();
+                        Log.d("StashMedia", "Image saved to gallery");
+                    } else {
+                        Log.e("StashMedia", "Output stream is null");
+                    }
                 } catch (IOException e) {
                     Log.e("StashMedia", "Failed to save image: " + e.getMessage());
                 }
