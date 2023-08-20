@@ -52,10 +52,20 @@ class StashMedia {
                     let activityController = UIActivityViewController(activityItems: [temporaryFileURL], applicationActivities: nil)
 
                     if let rootViewController = UIApplication.shared.windows.first?.rootViewController {
-                        activityController.popoverPresentationController?.sourceView = rootViewController.view
-                        rootViewController.present(activityController, animated: true) {
-                            completion(true, "Image shared successfully")
+                        activityController.completionWithItemsHandler = { activityType, completed, _, _ in
+
+                            // Delete the temporary file after sharing is complete
+                            do {
+                                try FileManager.default.removeItem(at: temporaryFileURL)
+                            } catch {
+                                print("Error deleting temporary file: \(error)")
+                            }
                         }
+
+                        activityController.popoverPresentationController?.sourceView = rootViewController.view
+                        rootViewController.present(activityController, animated: true, completion: nil)
+
+                        completion(true, "Image shared successfully")
                     } else {
                         completion(false, "Unable to present share dialog")
                     }
@@ -65,7 +75,6 @@ class StashMedia {
             }
         }.resume()
     }
-
 
     func saveImageToPhotoLibrary(from imageURL: URL, completion: @escaping (Bool, String) -> Void) {
         let options: SDWebImageDownloaderOptions = [.preloadAllFrames]
