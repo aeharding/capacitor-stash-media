@@ -36,4 +36,18 @@ public class StashMediaPlugin: CAPPlugin {
             call.reject("INVALID_PARAMETERS", "URL parameter is missing", nil)
         }
     }
+
+    @objc func shareImage(_ call: CAPPluginCall) {
+        if let urlString = call.getString("url"), let title = call.getString("title") {
+            stashMedia.shareImage(from: urlString, title: title) { success, message in
+                if success {
+                    call.resolve(["success": true, "message": message])
+                } else {
+                    call.reject("SHARE_FAILED", message, nil)
+                }
+            }
+        } else {
+            call.reject("INVALID_PARAMETERS", "URL parameter is missing", nil)
+        }
+    }
 }

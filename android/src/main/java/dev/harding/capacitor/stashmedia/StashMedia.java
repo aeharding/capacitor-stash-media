@@ -4,18 +4,26 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Base64;
 import android.util.Log;
+import android.webkit.MimeTypeMap;
+
+import androidx.core.content.FileProvider;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 
@@ -110,5 +118,46 @@ public class StashMedia {
         } catch (IOException e) {
             Log.e("StashMedia", "Failed to fetch image data: " + e.getMessage());
         }
+    }
+
+    public void downloadAndSaveImageForSharing(Context context, String imageUrl, String title, ImageDownloadListener listener) {
+        try {
+            URL url = new URL(imageUrl);
+            URLConnection connection = url.openConnection();
+            connection.connect();
+
+            String mimeType = connection.getContentType();
+            String fileExtension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType);
+
+            if (fileExtension == null || fileExtension.isEmpty()) {
+                fileExtension = "jpg"; // Default to JPEG if extension is unknown
+            }
+
+            File cacheDir = context.getCacheDir();
+            File outputFile = new File(cacheDir, title + "." + fileExtension);
+
+            FileOutputStream outputStream = new FileOutputStream(outputFile);
+            InputStream inputStream = connection.getInputStream();
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+            outputStream.close();
+            inputStream.close();
+
+            outputFile.deleteOnExit();
+            Uri imageUri = FileProvider.getUriForFile(context, context.getPackageName() + ".fileprovider", outputFile);
+
+            listener.onImageDownloaded(imageUri);
+        } catch (IOException e) {
+            listener.onImageDownloadFailed();
+            e.printStackTrace();
+        }
+    }
+
+    interface ImageDownloadListener {
+        void onImageDownloaded(Uri imageUri);
+        void onImageDownloadFailed();
     }
 }

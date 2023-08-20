@@ -22,6 +22,51 @@ class StashMedia {
         }
     }
 
+    func shareImage(from imageURLString: String, title: String, completion: @escaping (Bool, String) -> Void) {
+        guard let url = URL(string: imageURLString) else {
+            completion(false, "Invalid URL")
+            return
+        }
+
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            if let error = error {
+                completion(false, "Error downloading image: \(error)")
+                return
+            }
+
+            guard let data = data else {
+                completion(false, "Invalid image data")
+                return
+            }
+
+            let fileExtension = url.pathExtension
+            let temporaryDirectoryURL = FileManager.default.temporaryDirectory
+            let temporaryFileURL = temporaryDirectoryURL
+                .appendingPathComponent(title)
+                .appendingPathExtension(fileExtension)
+
+            do {
+                try data.write(to: temporaryFileURL)
+
+                DispatchQueue.main.async {
+                    let activityController = UIActivityViewController(activityItems: [temporaryFileURL], applicationActivities: nil)
+
+                    if let rootViewController = UIApplication.shared.windows.first?.rootViewController {
+                        activityController.popoverPresentationController?.sourceView = rootViewController.view
+                        rootViewController.present(activityController, animated: true) {
+                            completion(true, "Image shared successfully")
+                        }
+                    } else {
+                        completion(false, "Unable to present share dialog")
+                    }
+                }
+            } catch {
+                completion(false, "Error saving image to temporary file")
+            }
+        }.resume()
+    }
+
+
     func saveImageToPhotoLibrary(from imageURL: URL, completion: @escaping (Bool, String) -> Void) {
         let options: SDWebImageDownloaderOptions = [.preloadAllFrames]
 

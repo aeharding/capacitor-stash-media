@@ -4,4 +4,5 @@
 CAP_PLUGIN(StashMediaPlugin, "StashMedia",
            CAP_PLUGIN_METHOD(copyPhotoToClipboard, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(savePhoto, CAPPluginReturnPromise);
+           CAP_PLUGIN_METHOD(shareImage, CAPPluginReturnPromise);
 )

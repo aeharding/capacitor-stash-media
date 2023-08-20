@@ -15,6 +15,7 @@ npx cap sync
 
 * [`savePhoto(...)`](#savephoto)
 * [`copyPhotoToClipboard(...)`](#copyphototoclipboard)
+* [`shareImage(...)`](#shareimage)
 
 </docgen-index>
 
@@ -24,12 +25,14 @@ npx cap sync
 ### savePhoto(...)
 
 ```typescript
-savePhoto(options: { url: string; }) => Promise<void>
+savePhoto(options: { url: string; }) => any
 ```
 
 | Param         | Type                          |
 | ------------- | ----------------------------- |
 | **`options`** | <code>{ url: string; }</code> |
+
+**Returns:** <code>any</code>
 
 --------------------
 
@@ -37,12 +40,29 @@ savePhoto(options: { url: string; }) => Promise<void>
 ### copyPhotoToClipboard(...)
 
 ```typescript
-copyPhotoToClipboard(options: { url: string; }) => Promise<void>
+copyPhotoToClipboard(options: { url: string; }) => any
 ```
 
 | Param         | Type                          |
 | ------------- | ----------------------------- |
 | **`options`** | <code>{ url: string; }</code> |
+
+**Returns:** <code>any</code>
+
+--------------------
+
+
+### shareImage(...)
+
+```typescript
+shareImage(options: { url: string; title: string; }) => any
+```
+
+| Param         | Type                                         |
+| ------------- | -------------------------------------------- |
+| **`options`** | <code>{ url: string; title: string; }</code> |
+
+**Returns:** <code>any</code>
 
 --------------------
 

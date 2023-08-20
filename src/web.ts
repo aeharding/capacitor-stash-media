@@ -10,4 +10,8 @@ export class StashMediaWeb extends WebPlugin implements StashMediaPlugin {
   async copyPhotoToClipboard(): Promise<void> {
     throw new Error('Unsupported on the web');
   }
+
+  async shareImage(): Promise<void> {
+    throw new Error('Unsupported on the web');
+  }
 }
