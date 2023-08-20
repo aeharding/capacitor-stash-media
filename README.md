@@ -25,14 +25,12 @@ npx cap sync
 ### savePhoto(...)
 
 ```typescript
-savePhoto(options: { url: string; }) => any
+savePhoto(options: { url: string; }) => Promise<void>
 ```
 
 | Param         | Type                          |
 | ------------- | ----------------------------- |
 | **`options`** | <code>{ url: string; }</code> |
-
-**Returns:** <code>any</code>
 
 --------------------
 
@@ -40,14 +38,12 @@ savePhoto(options: { url: string; }) => any
 ### copyPhotoToClipboard(...)
 
 ```typescript
-copyPhotoToClipboard(options: { url: string; }) => any
+copyPhotoToClipboard(options: { url: string; }) => Promise<void>
 ```
 
 | Param         | Type                          |
 | ------------- | ----------------------------- |
 | **`options`** | <code>{ url: string; }</code> |
-
-**Returns:** <code>any</code>
 
 --------------------
 
@@ -55,14 +51,12 @@ copyPhotoToClipboard(options: { url: string; }) => any
 ### shareImage(...)
 
 ```typescript
-shareImage(options: { url: string; title: string; }) => any
+shareImage(options: { url: string; title: string; }) => Promise<void>
 ```
 
 | Param         | Type                                         |
 | ------------- | -------------------------------------------- |
 | **`options`** | <code>{ url: string; title: string; }</code> |
-
-**Returns:** <code>any</code>
 
 --------------------
 
