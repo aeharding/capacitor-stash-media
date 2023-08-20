@@ -1,9 +1,14 @@
 package dev.harding.capacitor.stashmedia;
 
 import android.Manifest;
+import android.content.ClipData;
+import android.content.ContentValues;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
+import android.provider.MediaStore;
 
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -13,6 +18,12 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.URL;
+import java.net.URLConnection;
 
 @CapacitorPlugin(name = "StashMedia")
 public class StashMediaPlugin extends Plugin {
@@ -60,4 +71,36 @@ public class StashMediaPlugin extends Plugin {
         stashMedia.savePhoto(context, url);
         call.resolve();
     }
+
+    @PluginMethod
+    public void shareImage(PluginCall call) {
+        String imageUrl = call.getString("url");
+        String title = call.getString("title");
+
+        if (imageUrl != null && title != null) {
+            stashMedia.downloadAndSaveImageForSharing(getContext(), imageUrl, title, new StashMedia.ImageDownloadListener() {
+                @Override
+                public void onImageDownloaded(Uri imageUri) {
+                    Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                    shareIntent.setType("image/*");
+                    shareIntent.putExtra(Intent.EXTRA_STREAM, imageUri);
+                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    shareIntent.setClipData(ClipData.newRawUri("", imageUri));
+
+                    Intent chooserIntent = Intent.createChooser(shareIntent, "Share Image");
+                    getActivity().startActivity(chooserIntent);
+
+                    call.resolve();
+                }
+
+                @Override
+                public void onImageDownloadFailed() {
+                    call.reject("DOWNLOAD_FAILED", "Failed to download and save the image");
+                }
+            });
+        } else {
+            call.reject("INVALID_PARAMETERS", "URL or title parameter is missing");
+        }
+    }
+
 }
