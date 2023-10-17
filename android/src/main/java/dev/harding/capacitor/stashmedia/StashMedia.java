@@ -26,6 +26,8 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class StashMedia {
     public void copyPhotoToClipboard(Context context, String imageUrl) {
@@ -64,7 +66,11 @@ public class StashMedia {
 
         try (ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
             bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
-            String path = MediaStore.Images.Media.insertImage(context.getContentResolver(), bitmap, "Image", null);
+
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
+            String dateTimeString = dateFormat.format(new Date());
+
+            String path = MediaStore.Images.Media.insertImage(context.getContentResolver(), bitmap, "Image_" + dateTimeString, null);
             imageUri = Uri.parse(path);
         } catch (IOException e) {
             Log.e("StashMedia", "Failed to convert bitmap to URI: " + e.getMessage());
@@ -89,8 +95,11 @@ public class StashMedia {
 
             String mimeType = connection.getContentType();
 
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
+            String dateTimeString = dateFormat.format(new Date());
+
             ContentValues contentValues = new ContentValues();
-            contentValues.put(MediaStore.Images.Media.DISPLAY_NAME, "Image");
+            contentValues.put(MediaStore.Images.Media.DISPLAY_NAME, "Image_" + dateTimeString);
             contentValues.put(MediaStore.Images.Media.MIME_TYPE, mimeType);
 
             Uri imageUri = context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues);
