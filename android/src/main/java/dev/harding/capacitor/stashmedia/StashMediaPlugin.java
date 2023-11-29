@@ -68,8 +68,18 @@ public class StashMediaPlugin extends Plugin {
             }
         }
 
-        stashMedia.savePhoto(context, url);
-        call.resolve();
+
+        stashMedia.savePhoto(context, url, new StashMedia.StashMediaCallback() {
+            @Override
+            public void onSuccess() {
+                call.resolve();
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                call.reject(errorMessage);
+            }
+        });
     }
 
     @PluginMethod

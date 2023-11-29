@@ -4,13 +4,10 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.ContentValues;
 import android.content.Context;
-import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
-import android.os.Environment;
 import android.provider.MediaStore;
-import android.util.Base64;
 import android.util.Log;
 import android.webkit.MimeTypeMap;
 
@@ -23,11 +20,14 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLConnection;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 public class StashMedia {
     public void copyPhotoToClipboard(Context context, String imageUrl) {
@@ -49,16 +49,23 @@ public class StashMedia {
     }
 
     private Bitmap fetchImageFromURL(String imageUrl) throws IOException {
-        Bitmap bitmap = null;
+        OkHttpClient client = new OkHttpClient();
 
-        try (InputStream inputStream = new java.net.URL(imageUrl).openStream()) {
-            bitmap = BitmapFactory.decodeStream(inputStream);
+        Request request = new Request.Builder()
+                .url(imageUrl)
+                .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                Log.e("StashMedia", "Failed to fetch image: " + response.message());
+                throw new IOException("Failed to fetch image: " + response.message());
+            }
+
+            return BitmapFactory.decodeStream(response.body().byteStream());
         } catch (IOException e) {
             Log.e("StashMedia", "Failed to fetch image: " + e.getMessage());
             throw e;
         }
-
-        return bitmap;
     }
 
     private Uri bitmapToUri(Context context, Bitmap bitmap) {
@@ -87,27 +94,59 @@ public class StashMedia {
         }
     }
 
-    public void savePhoto(Context context, String url) {
-        try {
-            URL imageUrl = new URL(url);
-            URLConnection connection = imageUrl.openConnection();
-            connection.connect();
+    interface StashMediaCallback {
+        void onSuccess();
+        void onError(String errorMessage);
+    }
 
-            String mimeType = connection.getContentType();
+    public void savePhoto(Context context, String url, StashMediaCallback stashMediaCallback) {
+        OkHttpClient client = new OkHttpClient();
 
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
-            String dateTimeString = dateFormat.format(new Date());
+        Request request = new Request.Builder()
+                .url(url)
+                .build();
 
-            ContentValues contentValues = new ContentValues();
-            contentValues.put(MediaStore.Images.Media.DISPLAY_NAME, "Image_" + dateTimeString);
-            contentValues.put(MediaStore.Images.Media.MIME_TYPE, mimeType);
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                Log.e("StashMedia", "Failed to fetch image data: " + e.getMessage());
+                stashMediaCallback.onError("Failed to fetch image data: " + e.getMessage());
+            }
 
-            Uri imageUri = context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues);
+            @Override
+            public void onResponse(Call call, Response response) {
+                try {
+                    if (!response.isSuccessful()) {
+                        Log.e("StashMedia", "Failed to download image: " + response.message());
+                        stashMediaCallback.onError("Failed to download image: " + response.message());
+                        return;
+                    }
 
-            if (imageUri != null) {
-                try (OutputStream outputStream = context.getContentResolver().openOutputStream(imageUri);
-                     InputStream inputStream = new BufferedInputStream(connection.getInputStream())) {
-                    if (outputStream != null) {
+                    String mimeType = response.header("Content-Type");
+
+                    SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
+                    String dateTimeString = dateFormat.format(new Date());
+
+                    ContentValues contentValues = new ContentValues();
+                    contentValues.put(MediaStore.Images.Media.DISPLAY_NAME, "Image_" + dateTimeString);
+                    contentValues.put(MediaStore.Images.Media.MIME_TYPE, mimeType);
+
+                    Uri imageUri = context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues);
+
+                    if (imageUri == null) {
+                        Log.e("StashMedia", "Failed to create image URI");
+                        stashMediaCallback.onError("Failed to create image URI");
+                        return;
+                    }
+
+                    try (OutputStream outputStream = context.getContentResolver().openOutputStream(imageUri);
+                         BufferedInputStream inputStream = new BufferedInputStream(response.body().byteStream())) {
+                        if (outputStream == null) {
+                            Log.e("StashMedia", "Output stream is null");
+                            stashMediaCallback.onError("Failed to download image: Output stream is null");
+                            return;
+                        }
+
                         byte[] buffer = new byte[4096];
                         int bytesRead;
                         while ((bytesRead = inputStream.read(buffer)) != -1) {
@@ -115,58 +154,72 @@ public class StashMedia {
                         }
                         outputStream.flush();
                         Log.d("StashMedia", "Image saved to gallery");
-                    } else {
-                        Log.e("StashMedia", "Output stream is null");
+                        stashMediaCallback.onSuccess();
+                    } catch (IOException e) {
+                        Log.e("StashMedia", "Failed to save image: " + e.getMessage());
+                        stashMediaCallback.onError("Failed to save image: " + e.getMessage());
                     }
-                } catch (IOException e) {
-                    Log.e("StashMedia", "Failed to save image: " + e.getMessage());
+                } finally {
+                    response.close();
                 }
-            } else {
-                Log.e("StashMedia", "Failed to create image URI");
             }
-        } catch (IOException e) {
-            Log.e("StashMedia", "Failed to fetch image data: " + e.getMessage());
-        }
+        });
     }
 
     public void downloadAndSaveImageForSharing(Context context, String imageUrl, String title, ImageDownloadListener listener) {
-        try {
-            URL url = new URL(imageUrl);
-            URLConnection connection = url.openConnection();
-            connection.connect();
+        OkHttpClient client = new OkHttpClient();
 
-            String mimeType = connection.getContentType();
-            String fileExtension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType);
+        Request request = new Request.Builder()
+                .url(imageUrl)
+                .build();
 
-            if (fileExtension == null || fileExtension.isEmpty()) {
-                fileExtension = "jpg"; // Default to JPEG if extension is unknown
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                listener.onImageDownloadFailed();
+                e.printStackTrace();
             }
 
-            File cacheDir = context.getCacheDir();
-            File outputFile = new File(cacheDir, title + "." + fileExtension);
+            @Override
+            public void onResponse(Call call, Response response) {
+                try {
+                    if (!response.isSuccessful()) {
+                        listener.onImageDownloadFailed();
+                        return;
+                    }
 
-            FileOutputStream outputStream = new FileOutputStream(outputFile);
-            InputStream inputStream = connection.getInputStream();
-            byte[] buffer = new byte[4096];
-            int bytesRead;
-            while ((bytesRead = inputStream.read(buffer)) != -1) {
-                outputStream.write(buffer, 0, bytesRead);
+                    String mimeType = response.header("Content-Type");
+                    String fileExtension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType);
+
+                    File cacheDir = context.getCacheDir();
+                    File outputFile = new File(cacheDir, title + "." + fileExtension);
+
+                    try (FileOutputStream outputStream = new FileOutputStream(outputFile);
+                         InputStream inputStream = response.body().byteStream()) {
+                        byte[] buffer = new byte[4096];
+                        int bytesRead;
+                        while ((bytesRead = inputStream.read(buffer)) != -1) {
+                            outputStream.write(buffer, 0, bytesRead);
+                        }
+                    }
+
+                    outputFile.deleteOnExit();
+                    Uri imageUri = FileProvider.getUriForFile(context, context.getPackageName() + ".fileprovider", outputFile);
+
+                    listener.onImageDownloaded(imageUri);
+                } catch (IOException e) {
+                    listener.onImageDownloadFailed();
+                    e.printStackTrace();
+                } finally {
+                    response.close();
+                }
             }
-            outputStream.close();
-            inputStream.close();
-
-            outputFile.deleteOnExit();
-            Uri imageUri = FileProvider.getUriForFile(context, context.getPackageName() + ".fileprovider", outputFile);
-
-            listener.onImageDownloaded(imageUri);
-        } catch (IOException e) {
-            listener.onImageDownloadFailed();
-            e.printStackTrace();
-        }
+        });
     }
 
     interface ImageDownloadListener {
         void onImageDownloaded(Uri imageUri);
         void onImageDownloadFailed();
     }
+
 }
