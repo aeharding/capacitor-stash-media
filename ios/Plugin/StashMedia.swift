@@ -22,6 +22,38 @@ class StashMedia {
         }
     }
 
+    func fileExtension(forMimeType mimeType: String) -> String {
+        if #available(iOS 14.0, *) {
+            if let utType = UTType(mimeType: mimeType) {
+                return utType.preferredFilenameExtension ?? ""
+            }
+        } else {
+            switch mimeType {
+                case "image/jpeg":
+                    return "jpeg"
+                case "image/png":
+                    return "png"
+                case "image/gif":
+                    return "gif"
+                case "image/webp":
+                    return "webp"
+                case "image/jxl":
+                    return "jxl"
+                case "video/mp4":
+                    return "mp4"
+                case "video/quicktime":
+                    return "mov"
+                case "video/x-matroska":
+                    return "mkv"
+                case "video/webm":
+                    return "webm"
+                default:
+                    return ""
+            }
+        }
+        return ""
+    }
+
     func shareImage(from imageURLString: String, title: String, completion: @escaping (Bool, String) -> Void) {
         guard let url = URL(string: imageURLString) else {
             completion(false, "Invalid URL")
@@ -39,7 +71,13 @@ class StashMedia {
                 return
             }
 
-            let fileExtension = url.pathExtension
+            guard let mimeType = response?.mimeType else {
+                completion(false, "Unable to determine MIME type")
+                return
+            }
+
+            let fileExtension = self.fileExtension(forMimeType: mimeType)
+
             let temporaryDirectoryURL = FileManager.default.temporaryDirectory
             let temporaryFileURL = temporaryDirectoryURL
                 .appendingPathComponent(title)
