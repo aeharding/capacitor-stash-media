@@ -114,68 +114,45 @@ class StashMedia {
         }.resume()
     }
 
-    func saveImageToPhotoLibrary(from imageURL: URL, completion: @escaping (Bool, String) -> Void) {
-        let options: SDWebImageDownloaderOptions = [.preloadAllFrames]
-
-        SDWebImageDownloader.shared.downloadImage(with: imageURL, options: options, progress: nil) { (image, data, error, _) in
+    func saveMediaToPhotoLibrary(from mediaURL: URL, isVideo: Bool, completion: @escaping (Bool, String) -> Void) {
+        let session = URLSession.shared
+        let downloadTask = session.dataTask(with: mediaURL) { data, response, error in
             if let error = error {
-                completion(false, "Failed to download image: \(error.localizedDescription)")
+                completion(false, "Failed to download media: \(error.localizedDescription)")
                 return
             }
 
-            guard let image = image else {
-                completion(false, "Failed to download image")
+            guard let mediaData = data else {
+                completion(false, "Failed to download media data from the URL")
                 return
             }
 
-            guard let imageData = data else {
-                completion(false, "Failed to download image data from the URL")
-                return
-            }
-
-            // Non-anmated image
-            if image.sd_isAnimated != true {
-                PHPhotoLibrary.shared().performChanges {
-                    PHAssetChangeRequest.creationRequestForAsset(from: image)
-                } completionHandler: { success, error in
-                    if success {
-                        completion(true, "Image saved to photo library")
-                    } else if let error = error {
-                        completion(false, "Failed to save image: \(error.localizedDescription)")
-                    } else {
-                        completion(false, "Failed to save image")
-                    }
-                }
-
-                return
-            }
-
-            let originalFileName = imageURL.lastPathComponent
-            var fileURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(originalFileName)
-
-            // Append .gif to the end of the file name
-            if !originalFileName.lowercased().hasSuffix(".gif") {
-                fileURL.deletePathExtension()
-                fileURL.appendPathExtension("gif")
-            }
+            let temporaryDirectoryURL = FileManager.default.temporaryDirectory
+            let temporaryFileURL = temporaryDirectoryURL.appendingPathComponent(mediaURL.lastPathComponent)
 
             do {
-                try imageData.write(to: fileURL)
+                try mediaData.write(to: temporaryFileURL)
+
                 PHPhotoLibrary.shared().performChanges {
-                    PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: fileURL)
+                    if isVideo {
+                        PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: temporaryFileURL)
+                    } else {
+                        PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: temporaryFileURL)
+                    }
                 } completionHandler: { success, error in
                     if success {
-                        completion(true, "Image saved to photo library")
-                        try? FileManager.default.removeItem(at: fileURL)
+                        completion(true, "Media saved to photo library")
+                        try? FileManager.default.removeItem(at: temporaryFileURL)
                     } else if let error = error {
-                        completion(false, "Failed to save image: \(error.localizedDescription)")
+                        completion(false, "Failed to save media: \(error.localizedDescription)")
                     } else {
-                        completion(false, "Failed to save image")
+                        completion(false, "Failed to save media")
                     }
                 }
             } catch {
-                completion(false, "Failed to write image data to file: \(error.localizedDescription)")
+                completion(false, "Failed to write media data to file: \(error.localizedDescription)")
             }
         }
+        downloadTask.resume()
     }
 }
