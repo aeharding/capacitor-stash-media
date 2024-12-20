@@ -6,7 +6,15 @@ import Capacitor
  * here: https://capacitorjs.com/docs/plugins/ios
  */
 @objc(StashMediaPlugin)
-public class StashMediaPlugin: CAPPlugin {
+public class StashMediaPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "StashMediaPlugin"
+    public let jsName = "StashMedia"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "copyPhotoToClipboard", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "savePhoto", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "saveVideo", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "shareImage", returnType: CAPPluginReturnPromise),
+    ]
     private let stashMedia = StashMedia()
 
     @objc func copyPhotoToClipboard(_ call: CAPPluginCall) {
