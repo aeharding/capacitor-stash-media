@@ -7,10 +7,6 @@ export class StashMediaWeb extends WebPlugin implements StashMediaPlugin {
     throw new Error('Unsupported on the web');
   }
 
-  async saveVideo(): Promise<void> {
-    throw new Error('Unsupported on the web');
-  }
-
   async copyPhotoToClipboard(): Promise<void> {
     throw new Error('Unsupported on the web');
   }

@@ -14,7 +14,6 @@ npx cap sync
 <docgen-index>
 
 * [`savePhoto(...)`](#savephoto)
-* [`saveVideo(...)`](#savevideo)
 * [`copyPhotoToClipboard(...)`](#copyphototoclipboard)
 * [`shareImage(...)`](#shareimage)
 
@@ -27,19 +26,6 @@ npx cap sync
 
 ```typescript
 savePhoto(options: { url: string; }) => Promise<void>
-```
-
-| Param         | Type                          |
-| ------------- | ----------------------------- |
-| **`options`** | <code>{ url: string; }</code> |
-
---------------------
-
-
-### saveVideo(...)
-
-```typescript
-saveVideo(options: { url: string; }) => Promise<void>
 ```
 
 | Param         | Type                          |
