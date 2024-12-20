@@ -7,14 +7,14 @@ import Capacitor
  */
 @objc(StashMediaPlugin)
 public class StashMediaPlugin: CAPPlugin, CAPBridgedPlugin {
-    public let identifier = "StashMediaPlugin" 
-    public let jsName = "StashMedia" 
+    public let identifier = "StashMediaPlugin"
+    public let jsName = "StashMedia"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "copyPhotoToClipboard", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "savePhoto", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveVideo", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "shareImage", returnType: CAPPluginReturnPromise),
-    ] 
+    ]
     private let stashMedia = StashMedia()
 
     @objc func copyPhotoToClipboard(_ call: CAPPluginCall) {
@@ -33,7 +33,7 @@ public class StashMediaPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func savePhoto(_ call: CAPPluginCall) {
         if let urlString = call.getString("url"), let imageUrl = URL(string: urlString) {
-            stashMedia.saveMediaToPhotoLibrary(from: imageUrl, isVideo: false) { success, message in
+            stashMedia.saveImageToPhotoLibrary(from: imageUrl) { success, message in
                 if success {
                     call.resolve(["success": true, "message": message])
                 } else {
@@ -52,20 +52,6 @@ public class StashMediaPlugin: CAPPlugin, CAPBridgedPlugin {
                     call.resolve(["success": true, "message": message])
                 } else {
                     call.reject("SHARE_FAILED", message, nil)
-                }
-            }
-        } else {
-            call.reject("INVALID_PARAMETERS", "URL parameter is missing", nil)
-        }
-    }
-
-    @objc func saveVideo(_ call: CAPPluginCall) {
-        if let urlString = call.getString("url"), let videoUrl = URL(string: urlString) {
-            stashMedia.saveMediaToPhotoLibrary(from: videoUrl, isVideo: true) { success, message in
-                if success {
-                    call.resolve(["success": true, "message": message])
-                } else {
-                    call.reject("SAVE_FAILED", message, nil)
                 }
             }
         } else {
