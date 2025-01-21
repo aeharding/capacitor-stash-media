@@ -9,16 +9,13 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.MediaStore;
-
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -37,9 +34,11 @@ public class StashMediaPlugin extends Plugin {
 
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
             // Check if permission is not granted
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            if (
+                ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+            ) {
                 // Request permission
-                ActivityCompat.requestPermissions(getActivity(), new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 9002);
+                ActivityCompat.requestPermissions(getActivity(), new String[] { Manifest.permission.WRITE_EXTERNAL_STORAGE }, 9002);
 
                 call.reject("Permissions requested");
 
@@ -58,9 +57,11 @@ public class StashMediaPlugin extends Plugin {
 
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
             // Check if permission is not granted
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            if (
+                ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+            ) {
                 // Request permission
-                ActivityCompat.requestPermissions(getActivity(), new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 9001);
+                ActivityCompat.requestPermissions(getActivity(), new String[] { Manifest.permission.WRITE_EXTERNAL_STORAGE }, 9001);
 
                 call.reject("Permissions requested");
 
@@ -68,18 +69,57 @@ public class StashMediaPlugin extends Plugin {
             }
         }
 
+        stashMedia.savePhoto(
+            context,
+            url,
+            new StashMedia.StashMediaCallback() {
+                @Override
+                public void onSuccess() {
+                    call.resolve();
+                }
 
-        stashMedia.savePhoto(context, url, new StashMedia.StashMediaCallback() {
-            @Override
-            public void onSuccess() {
-                call.resolve();
+                @Override
+                public void onError(String errorMessage) {
+                    call.reject(errorMessage);
+                }
             }
+        );
+    }
 
-            @Override
-            public void onError(String errorMessage) {
-                call.reject(errorMessage);
+    @PluginMethod
+    public void saveVideo(PluginCall call) {
+        String url = call.getString("url");
+        Context context = getContext();
+
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+            // Check if permission is not granted
+            if (
+                ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+            ) {
+                // Request permission
+                ActivityCompat.requestPermissions(getActivity(), new String[] { Manifest.permission.WRITE_EXTERNAL_STORAGE }, 9003);
+
+                call.reject("Permissions requested");
+
+                return;
             }
-        });
+        }
+
+        stashMedia.saveVideo(
+            context,
+            url,
+            new StashMedia.StashMediaCallback() {
+                @Override
+                public void onSuccess() {
+                    call.resolve();
+                }
+
+                @Override
+                public void onError(String errorMessage) {
+                    call.reject(errorMessage);
+                }
+            }
+        );
     }
 
     @PluginMethod
@@ -88,29 +128,33 @@ public class StashMediaPlugin extends Plugin {
         String title = call.getString("title");
 
         if (imageUrl != null && title != null) {
-            stashMedia.downloadAndSaveImageForSharing(getContext(), imageUrl, title, new StashMedia.ImageDownloadListener() {
-                @Override
-                public void onImageDownloaded(Uri imageUri) {
-                    Intent shareIntent = new Intent(Intent.ACTION_SEND);
-                    shareIntent.setType("image/*");
-                    shareIntent.putExtra(Intent.EXTRA_STREAM, imageUri);
-                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    shareIntent.setClipData(ClipData.newRawUri("", imageUri));
+            stashMedia.downloadAndSaveImageForSharing(
+                getContext(),
+                imageUrl,
+                title,
+                new StashMedia.ImageDownloadListener() {
+                    @Override
+                    public void onImageDownloaded(Uri imageUri) {
+                        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                        shareIntent.setType("image/*");
+                        shareIntent.putExtra(Intent.EXTRA_STREAM, imageUri);
+                        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        shareIntent.setClipData(ClipData.newRawUri("", imageUri));
 
-                    Intent chooserIntent = Intent.createChooser(shareIntent, "Share Image");
-                    getActivity().startActivity(chooserIntent);
+                        Intent chooserIntent = Intent.createChooser(shareIntent, "Share Image");
+                        getActivity().startActivity(chooserIntent);
 
-                    call.resolve();
+                        call.resolve();
+                    }
+
+                    @Override
+                    public void onImageDownloadFailed() {
+                        call.reject("DOWNLOAD_FAILED", "Failed to download and save the image");
+                    }
                 }
-
-                @Override
-                public void onImageDownloadFailed() {
-                    call.reject("DOWNLOAD_FAILED", "Failed to download and save the image");
-                }
-            });
+            );
         } else {
             call.reject("INVALID_PARAMETERS", "URL or title parameter is missing");
         }
     }
-
 }
