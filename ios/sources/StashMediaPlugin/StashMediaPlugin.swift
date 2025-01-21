@@ -58,4 +58,18 @@ public class StashMediaPlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("INVALID_PARAMETERS", "URL parameter is missing", nil)
         }
     }
+
+    @objc func saveVideo(_ call: CAPPluginCall) {
+        if let urlString = call.getString("url") {
+            stashMedia.downloadAndSaveVideoToGallery(videoURL: urlString) { success, message in
+                if success {
+                    call.resolve(["success": true, "message": message])
+                } else {
+                    call.reject("SHARE_FAILED", message, nil)
+                }
+            }
+        } else {
+            call.reject("INVALID_PARAMETERS", "URL parameter is missing", nil)
+        }
+    }
 }

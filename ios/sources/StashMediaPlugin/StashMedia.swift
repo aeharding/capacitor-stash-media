@@ -178,4 +178,45 @@ class StashMedia {
             }
         }
     }
+
+    let defaultSession = URLSession(configuration: .default)
+    var dataTask: URLSessionDataTask? = nil
+
+    func downloadAndSaveVideoToGallery(videoURL: String, id: String = "default", completion: @escaping (Bool, String) -> Void) {
+        DispatchQueue.global(qos: .background).async {
+            if let url = URL(string: videoURL) {
+                let filePath = FileManager.default.temporaryDirectory.appendingPathComponent("\(id).mp4")
+                print("work started")
+                self.dataTask = self.defaultSession.dataTask(with: url, completionHandler: { [weak self] data, res, err in
+                    DispatchQueue.main.async {
+                        if let error = err {
+                            completion(false, "Error downloading video: \(error.localizedDescription)")
+                            return
+                        }
+                        
+                        do {
+                            try data?.write(to: filePath)
+                            PHPhotoLibrary.shared().performChanges({
+                                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: filePath)
+                            }) { completed, error in
+                                if completed {
+                                    completion(true, "Video saved to gallery")
+                                } else if let error = error {
+                                    completion(false, "Failed to save video: \(error.localizedDescription)")
+                                } else {
+                                    completion(false, "Failed to save video")
+                                }
+                            }
+                        } catch {
+                            completion(false, "Error writing video to file: \(error.localizedDescription)")
+                        }
+                    }
+                    self?.dataTask = nil
+                })
+                self.dataTask?.resume()
+            } else {
+                completion(false, "Invalid video URL")
+            }
+        }
+    }
 }
