@@ -186,7 +186,7 @@ class StashMedia {
         DispatchQueue.global(qos: .background).async {
             if let url = URL(string: videoURL) {
                 let filePath = FileManager.default.temporaryDirectory.appendingPathComponent("\(id).mp4")
-                print("work started")
+
                 self.dataTask = self.defaultSession.dataTask(with: url, completionHandler: { [weak self] data, res, err in
                     DispatchQueue.main.async {
                         if let error = err {
