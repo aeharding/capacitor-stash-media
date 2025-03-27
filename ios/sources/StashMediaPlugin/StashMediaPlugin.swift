@@ -15,11 +15,16 @@ public class StashMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "saveVideo", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "shareImage", returnType: CAPPluginReturnPromise),
     ]
-    private let stashMedia = StashMedia()
+
+    private var stashMedia: StashMedia?
+
+    override public func load() {
+        stashMedia = StashMedia(userAgent: self.bridge?.config.appendedUserAgentString)
+    }
 
     @objc func copyPhotoToClipboard(_ call: CAPPluginCall) {
         if let urlString = call.getString("url") {
-            stashMedia.copyPhotoToClipboard(from: urlString) { success, message in
+            stashMedia?.copyPhotoToClipboard(from: urlString) { success, message in
                 if success {
                     call.resolve(["success": true, "message": message])
                 } else {
@@ -33,7 +38,7 @@ public class StashMediaPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func savePhoto(_ call: CAPPluginCall) {
         if let urlString = call.getString("url"), let imageUrl = URL(string: urlString) {
-            stashMedia.saveImageToPhotoLibrary(from: imageUrl) { success, message in
+            stashMedia?.saveImageToPhotoLibrary(from: imageUrl) { success, message in
                 if success {
                     call.resolve(["success": true, "message": message])
                 } else {
@@ -47,7 +52,7 @@ public class StashMediaPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func shareImage(_ call: CAPPluginCall) {
         if let urlString = call.getString("url"), let title = call.getString("title") {
-            stashMedia.shareImage(from: urlString, title: title) { success, message in
+            stashMedia?.shareImage(from: urlString, title: title) { success, message in
                 if success {
                     call.resolve(["success": true, "message": message])
                 } else {
@@ -61,7 +66,7 @@ public class StashMediaPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func saveVideo(_ call: CAPPluginCall) {
         if let urlString = call.getString("url") {
-            stashMedia.downloadAndSaveVideoToGallery(videoURL: urlString) { success, message in
+            stashMedia?.downloadAndSaveVideoToGallery(videoURL: urlString) { success, message in
                 if success {
                     call.resolve(["success": true, "message": message])
                 } else {
