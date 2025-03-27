@@ -4,17 +4,57 @@ import Photos
 import SDWebImage
 
 class StashMedia {
+    private var customUserAgent: String?
+
+    private var _session: URLSession?
+
+    private var defaultSession: URLSession {
+        if _session == nil {
+            _session = createURLSession()
+        }
+        return _session!
+    }
+
+    init(userAgent: String? = nil) {
+        customUserAgent = userAgent
+
+        // Set up global request modifier for SDWebImageDownloader
+        if let userAgent = userAgent {
+            let requestModifier = SDWebImageDownloaderRequestModifier { request in
+                var mutableRequest = request
+                mutableRequest.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+                return mutableRequest
+            }
+            SDWebImageDownloader.shared.requestModifier = requestModifier
+        }
+    }
+
+    private func createURLSession() -> URLSession {
+        let configuration = URLSessionConfiguration.default
+        if let userAgent = customUserAgent {
+            configuration.httpAdditionalHeaders = ["User-Agent": userAgent]
+        }
+        return URLSession(configuration: configuration)
+    }
+
     func copyPhotoToClipboard(from imageURLString: String, completion: @escaping (Bool, String) -> Void) {
         if let imageURL = URL(string: imageURLString) {
-            DispatchQueue.global(qos: .background).async {
-                if let imageData = try? Data(contentsOf: imageURL),
-                   let image = UIImage(data: imageData) {
-                    DispatchQueue.main.async {
-                        UIPasteboard.general.image = image
-                        completion(true, "Image copied to clipboard")
-                    }
-                } else {
+            let options: SDWebImageDownloaderOptions = [.preloadAllFrames]
+
+            SDWebImageDownloader.shared.downloadImage(with: imageURL, options: options, progress: nil) { (image, data, error, _) in
+                if let error = error {
+                    completion(false, "Failed to fetch image: \(error.localizedDescription)")
+                    return
+                }
+
+                guard let image = image else {
                     completion(false, "Failed to fetch image data")
+                    return
+                }
+
+                DispatchQueue.main.async {
+                    UIPasteboard.general.image = image
+                    completion(true, "Image copied to clipboard")
                 }
             }
         } else {
@@ -60,7 +100,7 @@ class StashMedia {
             return
         }
 
-        URLSession.shared.dataTask(with: url) { data, response, error in
+        defaultSession.dataTask(with: url) { data, response, error in
             if let error = error {
                 completion(false, "Error downloading image: \(error)")
                 return
@@ -91,7 +131,6 @@ class StashMedia {
 
                     if let rootViewController = UIApplication.shared.windows.first?.rootViewController {
                         activityController.completionWithItemsHandler = { activityType, completed, _, _ in
-
                             // Delete the temporary file after sharing is complete
                             do {
                                 try FileManager.default.removeItem(at: temporaryFileURL)
@@ -179,7 +218,6 @@ class StashMedia {
         }
     }
 
-    let defaultSession = URLSession(configuration: .default)
     var dataTask: URLSessionDataTask? = nil
 
     func downloadAndSaveVideoToGallery(videoURL: String, id: String = "default", completion: @escaping (Bool, String) -> Void) {

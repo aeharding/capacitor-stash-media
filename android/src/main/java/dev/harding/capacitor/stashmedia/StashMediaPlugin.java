@@ -25,7 +25,13 @@ import java.net.URLConnection;
 @CapacitorPlugin(name = "StashMedia")
 public class StashMediaPlugin extends Plugin {
 
-    private StashMedia stashMedia = new StashMedia();
+    private StashMedia stashMedia;
+
+    @Override
+    public void load() {
+        String userAgent = getBridge().getConfig().getAppendedUserAgentString();
+        stashMedia = new StashMedia(userAgent);
+    }
 
     @PluginMethod
     public void copyPhotoToClipboard(PluginCall call) {
