@@ -28,11 +28,9 @@ import okhttp3.Response;
 
 public class StashMedia {
 
-    private String userAgent;
     private OkHttpClient client;
 
     public StashMedia(String userAgent) {
-        this.userAgent = userAgent;
         this.client = new OkHttpClient.Builder()
             .addInterceptor(chain -> {
                 Request originalRequest = chain.request();
@@ -197,6 +195,11 @@ public class StashMedia {
                         }
 
                         String mimeType = response.header("Content-Type");
+                        if (mimeType == null || !mimeType.startsWith("video/")) {
+                            Log.e("StashMedia", "Invalid content type for video: " + mimeType);
+                            stashMediaCallback.onError("URL does not point to a valid video file");
+                            return;
+                        }
 
                         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
                         String dateTimeString = dateFormat.format(new Date());
