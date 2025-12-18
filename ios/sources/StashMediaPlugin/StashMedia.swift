@@ -79,6 +79,8 @@ class StashMedia {
                     return "webp"
                 case "image/jxl":
                     return "jxl"
+                case "image/avif":
+                    return "avif"
                 case "video/mp4":
                     return "mp4"
                 case "video/quicktime":
