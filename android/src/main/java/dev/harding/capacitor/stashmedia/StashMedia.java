@@ -53,7 +53,7 @@ public class StashMedia {
                 copyImageToClipboard(context, imageUri);
                 Log.d("StashMedia", "Image copied to clipboard");
             } else {
-                Log.e("StashMedia", "Failed to fetch or decode image");
+                Log.e("StashMedia", "Failed to decode image for clipboard. Format may not be supported on this Android version.");
             }
         } catch (IOException e) {
             Log.e("StashMedia", "Failed to fetch image data: " + e.getMessage());
