@@ -1,6 +1,6 @@
 {
   "name": "capacitor-stash-media",
-  "version": "3.2.2",
+  "version": "3.2.3",
   "description": "Some helper functions for the user to stash (copy, save, etc) media from the app",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
