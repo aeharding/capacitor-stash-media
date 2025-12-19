@@ -1,7 +1,6 @@
 import Foundation
 import UIKit
 import Photos
-import SDWebImage
 
 class StashMedia {
     private var customUserAgent: String?
@@ -17,16 +16,6 @@ class StashMedia {
 
     init(userAgent: String? = nil) {
         customUserAgent = userAgent
-
-        // Set up global request modifier for SDWebImageDownloader
-        if let userAgent = userAgent {
-            let requestModifier = SDWebImageDownloaderRequestModifier { request in
-                var mutableRequest = request
-                mutableRequest.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-                return mutableRequest
-            }
-            SDWebImageDownloader.shared.requestModifier = requestModifier
-        }
     }
 
     private func createURLSession() -> URLSession {
@@ -37,226 +26,194 @@ class StashMedia {
         return URLSession(configuration: configuration)
     }
 
-    func copyPhotoToClipboard(from imageURLString: String, completion: @escaping (Bool, String) -> Void) {
-        if let imageURL = URL(string: imageURLString) {
-            let options: SDWebImageDownloaderOptions = [.preloadAllFrames]
-
-            SDWebImageDownloader.shared.downloadImage(with: imageURL, options: options, progress: nil) { (image, data, error, _) in
-                if let error = error {
-                    completion(false, "Failed to fetch image: \(error.localizedDescription)")
-                    return
-                }
-
-                guard let image = image else {
-                    completion(false, "Failed to fetch image data")
-                    return
-                }
-
-                DispatchQueue.main.async {
-                    UIPasteboard.general.image = image
-                    completion(true, "Image copied to clipboard")
-                }
-            }
-        } else {
-            completion(false, "Invalid URL")
-        }
-    }
-
-    func fileExtension(forMimeType mimeType: String) -> String {
-        if #available(iOS 14.0, *) {
-            if let utType = UTType(mimeType: mimeType) {
-                return utType.preferredFilenameExtension ?? ""
-            }
-        } else {
-            switch mimeType {
-                case "image/jpeg":
-                    return "jpeg"
-                case "image/png":
-                    return "png"
-                case "image/gif":
-                    return "gif"
-                case "image/webp":
-                    return "webp"
-                case "image/jxl":
-                    return "jxl"
-                case "image/avif":
-                    return "avif"
-                case "video/mp4":
-                    return "mp4"
-                case "video/quicktime":
-                    return "mov"
-                case "video/x-matroska":
-                    return "mkv"
-                case "video/webm":
-                    return "webm"
-                default:
-                    return ""
-            }
-        }
-        return ""
-    }
-
-    func shareImage(from imageURLString: String, title: String, completion: @escaping (Bool, String) -> Void) {
-        guard let url = URL(string: imageURLString) else {
-            completion(false, "Invalid URL")
+    private func downloadImageData(from urlString: String, completion: @escaping (Result<(Data, HTTPURLResponse?), Error>) -> Void) {
+        guard let url = URL(string: urlString) else {
+            completion(.failure(NSError(domain: "StashMedia", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
             return
         }
 
         defaultSession.dataTask(with: url) { data, response, error in
             if let error = error {
-                completion(false, "Error downloading image: \(error)")
+                completion(.failure(error))
                 return
             }
 
             guard let data = data else {
-                completion(false, "Invalid image data")
+                completion(.failure(NSError(domain: "StashMedia", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to fetch image data"])))
                 return
             }
 
-            guard let mimeType = response?.mimeType else {
-                completion(false, "Unable to determine MIME type")
-                return
-            }
-
-            let fileExtension = self.fileExtension(forMimeType: mimeType)
-
-            let temporaryDirectoryURL = FileManager.default.temporaryDirectory
-            let temporaryFileURL = temporaryDirectoryURL
-                .appendingPathComponent(title)
-                .appendingPathExtension(fileExtension)
-
-            do {
-                try data.write(to: temporaryFileURL)
-
-                DispatchQueue.main.async {
-                    let activityController = UIActivityViewController(activityItems: [temporaryFileURL], applicationActivities: nil)
-
-                    if let rootViewController = UIApplication.shared.windows.first?.rootViewController {
-                        activityController.completionWithItemsHandler = { activityType, completed, _, _ in
-                            // Delete the temporary file after sharing is complete
-                            do {
-                                try FileManager.default.removeItem(at: temporaryFileURL)
-                            } catch {
-                                print("Error deleting temporary file: \(error)")
-                            }
-                        }
-
-                        activityController.popoverPresentationController?.sourceView = rootViewController.view
-                        rootViewController.present(activityController, animated: true, completion: nil)
-
-                        completion(true, "Image shared successfully")
-                    } else {
-                        completion(false, "Unable to present share dialog")
-                    }
-                }
-            } catch {
-                completion(false, "Error saving image to temporary file")
-            }
+            completion(.success((data, response as? HTTPURLResponse)))
         }.resume()
     }
 
-    func saveImageToPhotoLibrary(from imageURL: URL, completion: @escaping (Bool, String) -> Void) {
-        let options: SDWebImageDownloaderOptions = [.preloadAllFrames]
-
-        SDWebImageDownloader.shared.downloadImage(with: imageURL, options: options, progress: nil) { (image, data, error, _) in
-            if let error = error {
-                completion(false, "Failed to download image: \(error.localizedDescription)")
-                return
-            }
-
-            guard let image = image else {
-                completion(false, "Failed to download image")
-                return
-            }
-
-            guard let imageData = data else {
-                completion(false, "Failed to download image data from the URL")
-                return
-            }
-
-            // Non-anmated image
-            if image.sd_isAnimated != true {
-                PHPhotoLibrary.shared().performChanges {
-                    PHAssetChangeRequest.creationRequestForAsset(from: image)
-                } completionHandler: { success, error in
-                    if success {
-                        completion(true, "Image saved to photo library")
-                    } else if let error = error {
-                        completion(false, "Failed to save image: \(error.localizedDescription)")
-                    } else {
-                        completion(false, "Failed to save image")
-                    }
+    private func downloadImage(from urlString: String, completion: @escaping (Result<(Data, String), Error>) -> Void) {
+        downloadImageData(from: urlString) { result in
+            switch result {
+            case .success((let data, let response)):
+                guard let mimeType = response?.mimeType else {
+                    completion(.failure(NSError(domain: "StashMedia", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unable to determine MIME type"])))
+                    return
                 }
-
-                return
-            }
-
-            let originalFileName = imageURL.lastPathComponent
-            var fileURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(originalFileName)
-
-            // Append .gif to the end of the file name
-            if !originalFileName.lowercased().hasSuffix(".gif") {
-                fileURL.deletePathExtension()
-                fileURL.appendPathExtension("gif")
-            }
-
-            do {
-                try imageData.write(to: fileURL)
-                PHPhotoLibrary.shared().performChanges {
-                    PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: fileURL)
-                } completionHandler: { success, error in
-                    if success {
-                        completion(true, "Image saved to photo library")
-                        try? FileManager.default.removeItem(at: fileURL)
-                    } else if let error = error {
-                        completion(false, "Failed to save image: \(error.localizedDescription)")
-                    } else {
-                        completion(false, "Failed to save image")
-                    }
-                }
-            } catch {
-                completion(false, "Failed to write image data to file: \(error.localizedDescription)")
+                completion(.success((data, mimeType)))
+            case .failure(let error):
+                completion(.failure(error))
             }
         }
     }
 
-    var dataTask: URLSessionDataTask? = nil
+    func copyPhotoToClipboard(from imageURLString: String, completion: @escaping (Bool, String) -> Void) {
+        downloadImage(from: imageURLString) { result in
+            switch result {
+            case .success((let data, _)):
+                DispatchQueue.main.async {
+                    if let image = UIImage(data: data) {
+                        UIPasteboard.general.image = image
+                        completion(true, "Image copied to clipboard")
+                    } else {
+                        completion(false, "Failed to decode image data")
+                    }
+                }
+            case .failure(let error):
+                completion(false, error.localizedDescription)
+            }
+        }
+    }
 
-    func downloadAndSaveVideoToGallery(videoURL: String, id: String = "default", completion: @escaping (Bool, String) -> Void) {
-        DispatchQueue.global(qos: .background).async {
-            if let url = URL(string: videoURL) {
-                let filePath = FileManager.default.temporaryDirectory.appendingPathComponent("\(id).mp4")
+    func fileExtension(forMimeType mimeType: String) -> String {
+        if let utType = UTType(mimeType: mimeType) {
+            return utType.preferredFilenameExtension ?? ""
+        }
+        return ""
+    }
 
-                self.dataTask = self.defaultSession.dataTask(with: url, completionHandler: { [weak self] data, res, err in
-                    DispatchQueue.main.async {
-                        if let error = err {
-                            completion(false, "Error downloading video: \(error.localizedDescription)")
-                            return
-                        }
-                        
+    func shareImage(from imageURLString: String, title: String, completion: @escaping (Bool, String) -> Void) {
+        downloadImage(from: imageURLString) { result in
+            switch result {
+            case .success((let data, let mimeType)):
+                self.shareImageData(data, mimeType: mimeType, title: title, completion: completion)
+            case .failure(let error):
+                completion(false, error.localizedDescription)
+            }
+        }
+    }
+
+    private func shareImageData(_ data: Data, mimeType: String, title: String, completion: @escaping (Bool, String) -> Void) {
+        // Convert AVIF to JPEG for better Messages compatibility
+        let processedData: Data
+        let processedExtension: String
+        if mimeType == "image/avif", let image = UIImage(data: data) {
+            processedData = image.jpegData(compressionQuality: 0.9) ?? data
+            processedExtension = "jpg"
+        } else {
+            processedData = data
+            processedExtension = self.fileExtension(forMimeType: mimeType)
+        }
+
+        let temporaryDirectoryURL = FileManager.default.temporaryDirectory
+        let temporaryFileURL = temporaryDirectoryURL
+            .appendingPathComponent(title)
+            .appendingPathExtension(processedExtension)
+
+        do {
+            try processedData.write(to: temporaryFileURL)
+
+            DispatchQueue.main.async {
+                let activityController = UIActivityViewController(activityItems: [temporaryFileURL], applicationActivities: nil)
+
+                if let rootViewController = UIApplication.shared.windows.first?.rootViewController {
+                    activityController.completionWithItemsHandler = { activityType, completed, _, _ in
+                        // Delete the temporary file after sharing is complete
                         do {
-                            try data?.write(to: filePath)
-                            PHPhotoLibrary.shared().performChanges({
-                                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: filePath)
-                            }) { completed, error in
-                                if completed {
-                                    completion(true, "Video saved to gallery")
-                                } else if let error = error {
-                                    completion(false, "Failed to save video: \(error.localizedDescription)")
-                                } else {
-                                    completion(false, "Failed to save video")
-                                }
-                            }
+                            try FileManager.default.removeItem(at: temporaryFileURL)
                         } catch {
-                            completion(false, "Error writing video to file: \(error.localizedDescription)")
+                            print("Error deleting temporary file: \(error)")
                         }
                     }
-                    self?.dataTask = nil
-                })
-                self.dataTask?.resume()
-            } else {
-                completion(false, "Invalid video URL")
+
+                    activityController.popoverPresentationController?.sourceView = rootViewController.view
+                    rootViewController.present(activityController, animated: true, completion: nil)
+
+                    completion(true, "Image shared successfully")
+                } else {
+                    completion(false, "Unable to present share dialog")
+                }
             }
+        } catch {
+            completion(false, "Error saving image to temporary file")
+        }
+    }
+
+    func saveImageToPhotoLibrary(from imageURL: URL, completion: @escaping (Bool, String) -> Void) {
+        downloadImage(from: imageURL.absoluteString) { result in
+            switch result {
+            case .success((let data, let mimeType)):
+                self.saveImageToLibrary(data, mimeType: mimeType, originalURL: imageURL, completion: completion)
+            case .failure(let error):
+                completion(false, error.localizedDescription)
+            }
+        }
+    }
+
+    private func handlePhotoLibraryCompletion(success: Bool, error: Error?, fileURL: URL, successMessage: String, completion: @escaping (Bool, String) -> Void) {
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        if success {
+            completion(true, successMessage)
+        } else if let error = error {
+            completion(false, "Failed to save: \(error.localizedDescription)")
+        } else {
+            completion(false, "Failed to save")
+        }
+    }
+
+    private func saveImageToLibrary(_ data: Data, mimeType: String, originalURL: URL, completion: @escaping (Bool, String) -> Void) {
+        let fileExtension = self.fileExtension(forMimeType: mimeType)
+        let originalFileName = originalURL.lastPathComponent
+        var fileURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(originalFileName)
+
+        // Ensure correct extension
+        if !originalFileName.lowercased().hasSuffix(".\(fileExtension)") {
+            fileURL.deletePathExtension()
+            fileURL.appendPathExtension(fileExtension)
+        }
+
+        do {
+            try data.write(to: fileURL)
+            PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: fileURL)
+            } completionHandler: { success, error in
+                self.handlePhotoLibraryCompletion(success: success, error: error, fileURL: fileURL, successMessage: "Image saved to photo library", completion: completion)
+            }
+        } catch {
+            completion(false, "Failed to write image data to file: \(error.localizedDescription)")
+        }
+    }
+
+    func downloadAndSaveVideoToGallery(videoURL: String, id: String = "default", completion: @escaping (Bool, String) -> Void) {
+        downloadImage(from: videoURL) { result in
+            switch result {
+            case .success((let data, let mimeType)):
+                self.saveVideoToLibrary(data, mimeType: mimeType, id: id, completion: completion)
+            case .failure(let error):
+                completion(false, error.localizedDescription)
+            }
+        }
+    }
+
+    private func saveVideoToLibrary(_ data: Data, mimeType: String, id: String, completion: @escaping (Bool, String) -> Void) {
+        let fileExtension = self.fileExtension(forMimeType: mimeType)
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(id).\(fileExtension)")
+
+        do {
+            try data.write(to: fileURL)
+            PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: fileURL)
+            } completionHandler: { success, error in
+                self.handlePhotoLibraryCompletion(success: success, error: error, fileURL: fileURL, successMessage: "Video saved to gallery", completion: completion)
+            }
+        } catch {
+            completion(false, "Failed to write video data to file: \(error.localizedDescription)")
         }
     }
 }
